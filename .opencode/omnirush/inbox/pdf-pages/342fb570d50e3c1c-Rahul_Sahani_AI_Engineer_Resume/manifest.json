@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "sha256": "342fb570d50e3c1cc75064c653b5fb7cb8100dcd2c7ab47990b182cc992f117c",
+  "filename": "Rahul_Sahani_AI_Engineer_Resume.pdf",
+  "pageCount": 1,
+  "textPages": 1,
+  "textBudgetExhausted": false,
+  "pagesWithoutText": [],
+  "renderedPages": [
+    {
+      "page": 1,
+      "width": 1108,
+      "height": 1566,
+      "bytes": 288488,
+      "mime": "image/png",
+      "fileName": "page-001.png"
+    }
+  ],
+  "renderBudgetExhausted": false
+}

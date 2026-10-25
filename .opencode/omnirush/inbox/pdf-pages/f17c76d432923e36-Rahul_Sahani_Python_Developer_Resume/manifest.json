@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "sha256": "f17c76d432923e361786d2a76c0d5120ffa22d0d264d87f6ac60a34cb750678d",
+  "filename": "Rahul_Sahani_Python_Developer_Resume.pdf",
+  "pageCount": 1,
+  "textPages": 1,
+  "textBudgetExhausted": false,
+  "pagesWithoutText": [],
+  "renderedPages": [
+    {
+      "page": 1,
+      "width": 1211,
+      "height": 1568,
+      "bytes": 269043,
+      "mime": "image/png",
+      "fileName": "page-001.png"
+    }
+  ],
+  "renderBudgetExhausted": false
+}
