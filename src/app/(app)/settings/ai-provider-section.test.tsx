@@ -15,7 +15,7 @@ vi.mock("./actions", () => ({
 }));
 vi.mock("@/components/toast", () => ({ toast: vi.fn(), toastResult: (result: unknown) => result }));
 
-const local: AiSettingsView = { provider: "LOCAL", baseUrl: "http://ollama:11434", model: "qwen2.5:3b", keyState: "none" };
+const local: AiSettingsView = { provider: "LOCAL", baseUrl: "http://ollama:11434", model: "qwen2.5:3b", agentModel: "", keyState: "none" };
 
 beforeEach(() => {
   vi.mocked(saveAiProvider).mockReset().mockResolvedValue({ ok: true, data: { keyState: "none" } });
@@ -34,10 +34,11 @@ describe("AiProviderSection", () => {
       "OpenAI-compatible",
       "Anthropic",
       "Mistral",
+      "Groq",
     ]);
     expect(screen.getByRole("radio", { name: "Local model" })).toBeChecked();
     expect(screen.getByLabelText("Server address")).toHaveValue("http://ollama:11434");
-    expect(await screen.findByRole("option", { name: "llama3.1:8b" })).toBeInTheDocument();
+    expect((await screen.findAllByRole("option", { name: "llama3.1:8b" })).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Model")).toHaveValue("qwen2.5:3b");
     expect(screen.getByText("Not needed for a local model")).toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
@@ -51,7 +52,7 @@ describe("AiProviderSection", () => {
     expect(screen.getByRole("note")).toHaveTextContent(/depend on your account with Anthropic\.$/);
     expect(screen.getByLabelText("API key")).toHaveAttribute("placeholder", "Stored encrypted on your server");
     await waitFor(() =>
-      expect(saveAiProvider).toHaveBeenCalledWith({ provider: "ANTHROPIC", baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5" }),
+      expect(saveAiProvider).toHaveBeenCalledWith({ provider: "ANTHROPIC", baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5", agentModel: "" }),
     );
   });
 
@@ -62,7 +63,7 @@ describe("AiProviderSection", () => {
     expect(screen.getByRole("note")).toHaveTextContent(/^Mistral receives what each task needs: .* depend on your account with Mistral\.$/);
     expect(screen.getByLabelText("API key")).toBeInTheDocument();
     await waitFor(() =>
-      expect(saveAiProvider).toHaveBeenCalledWith({ provider: "MISTRAL", baseUrl: "https://api.mistral.ai/v1", model: "mistral-medium-latest" }),
+      expect(saveAiProvider).toHaveBeenCalledWith({ provider: "MISTRAL", baseUrl: "https://api.mistral.ai/v1", model: "mistral-medium-latest", agentModel: "" }),
     );
   });
 
@@ -74,7 +75,7 @@ describe("AiProviderSection", () => {
     expect(screen.getByLabelText("API token")).toBeInTheDocument();
     expect(screen.getByText("Only needed if you've turned on authentication in LM Studio's server settings.")).toBeInTheDocument();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
-    await waitFor(() => expect(saveAiProvider).toHaveBeenCalledWith({ provider: "LMSTUDIO", baseUrl: "http://host.docker.internal:1234", model: "" }));
+    await waitFor(() => expect(saveAiProvider).toHaveBeenCalledWith({ provider: "LMSTUDIO", baseUrl: "http://host.docker.internal:1234", model: "", agentModel: "" }));
   });
 
   it("saves a key when you leave the field, then forgets it in the browser (E6-2)", async () => {
@@ -111,7 +112,7 @@ describe("AiProviderSection", () => {
 
   it("lets you type a model that isn't listed", async () => {
     render(<AiProviderSection initial={local} />);
-    await screen.findByRole("option", { name: "llama3.1:8b" });
+    await screen.findAllByRole("option", { name: "llama3.1:8b" });
     await userEvent.selectOptions(screen.getByLabelText("Model"), "Other model…");
     await userEvent.clear(screen.getByLabelText("Model name"));
     await userEvent.type(screen.getByLabelText("Model name"), "mistral-nemo:12b");

@@ -306,6 +306,8 @@ enum AiProvider {
   MISTRAL
   /// LM Studio on the user's own hardware (#210).
   LMSTUDIO
+  /// Groq's OpenAI-compatible API.
+  GROQ
 }
 
 enum Creativity {

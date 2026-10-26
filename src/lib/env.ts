@@ -10,7 +10,7 @@ const SECRET_MIN_LENGTH = 32;
 const GENERATE_SECRET = "for example the output of `openssl rand -base64 32`";
 const HASH_PASSWORD = "Make one with `docker run --rm -it ghcr.io/aientech/dossier hash-password`";
 
-export const AI_PROVIDERS = ["local", "openai", "anthropic", "mistral", "lmstudio"] as const;
+export const AI_PROVIDERS = ["local", "openai", "anthropic", "mistral", "lmstudio", "groq"] as const;
 export const JOB_SOURCE_NAMES = ["jsearch", "adzuna", "arbeitsagentur", "off"] as const;
 
 // An empty value (`DOSSIER_AI_KEY=` in .env) counts as unset.
@@ -94,6 +94,8 @@ const schema = z.object({
     }),
   ),
   DOSSIER_AI_MODEL: optional(z.string()),
+  /** Optional lower-cost model for the scheduled job agent and its subtasks. */
+  DOSSIER_AI_AGENT_MODEL: optional(z.string()),
   // Never echo the value: it's an API key.
   DOSSIER_AI_KEY: optional(z.string()),
   DOSSIER_AI_TIMEOUT_SECONDS: optional(

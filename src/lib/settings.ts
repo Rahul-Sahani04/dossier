@@ -105,6 +105,8 @@ export const settingsSchema = z.object({
   provider: z.enum(AiProvider).nullable().catch(null),
   baseUrl: z.string().nullable().catch(null),
   model: z.string().nullable().catch(null),
+  /** Optional lower-cost model for the scheduled job agent and its subtasks. */
+  agentModel: z.string().nullable().catch(null),
   /** Encrypted with a key derived from DOSSIER_SECRET (E6-2); never sent to the client. */
   apiKeyEnc: z.string().nullable().catch(null),
   creativity: z.enum(Creativity).catch(Creativity.BALANCED),

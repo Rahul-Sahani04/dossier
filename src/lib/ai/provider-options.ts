@@ -16,6 +16,8 @@ export const PROVIDER_OPTIONS: readonly {
   /** Shown under the address. */
   urlHint?: string;
   defaultModel: string;
+  /** A cheaper default for the scheduled agent and its subtasks, when available. */
+  defaultAgentModel?: string;
   /** The key field, if the card has one; `hint` says when it's needed. */
   apiKey: { label: string; hint?: string } | null;
 }[] = [
@@ -84,6 +86,19 @@ export const PROVIDER_OPTIONS: readonly {
     defaultModel: "mistral-medium-latest",
     apiKey: { label: "API key" },
   },
+  {
+    value: AiProvider.GROQ,
+    name: "Groq",
+    vendor: "Groq",
+    description: "Fast OpenAI-compatible models through Groq's API.",
+    tag: "Hosted · rate-limited",
+    local: false,
+    defaultUrl: "https://api.groq.com/openai/v1",
+    urlPlaceholder: "https://api.groq.com/openai/v1",
+    defaultModel: "openai/gpt-oss-120b",
+    defaultAgentModel: "openai/gpt-oss-20b",
+    apiKey: { label: "API key" },
+  },
 ];
 
 export function providerOption(provider: AiProvider) {
@@ -101,5 +116,6 @@ export type AiSettingsView = {
   provider: AiProvider;
   baseUrl: string;
   model: string;
+  agentModel: string;
   keyState: KeyState;
 };

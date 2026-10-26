@@ -1,5 +1,9 @@
 import "server-only";
 
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 import { chromium, type Browser } from "playwright-core";
 
 import { PRINT_TOKEN_HEADER, signPrintToken } from "./print-token";
@@ -36,12 +40,46 @@ function appOrigin(): string {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
+/**
+ * Finds a browser that is actually installed on the host. `playwright-core`
+ * does not download one itself, and a local macOS install commonly has Chrome
+ * but not Playwright's headless shell.
+ */
+export function browserExecutablePath(): string | undefined {
+  const candidates = [
+    process.env.DOSSIER_CHROME_PATH?.trim(),
+    chromium.executablePath(),
+    ...(process.platform === "darwin"
+      ? [
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          join(homedir(), "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+          "/Applications/Chromium.app/Contents/MacOS/Chromium",
+          join(homedir(), "Applications/Chromium.app/Contents/MacOS/Chromium"),
+        ]
+      : process.platform === "win32"
+        ? [
+            join(process.env.LOCALAPPDATA ?? "", "Google/Chrome/Application/chrome.exe"),
+            join(process.env.PROGRAMFILES ?? "", "Google/Chrome/Application/chrome.exe"),
+            join(process.env["PROGRAMFILES(X86)"] ?? "", "Google/Chrome/Application/chrome.exe"),
+          ]
+        : ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser"]),
+  ];
+  return candidates.find((candidate): candidate is string => candidate !== undefined && candidate !== "" && existsSync(candidate));
+}
+
 function browser(): Promise<Browser> {
   if (!pool.browser) {
+    const executablePath = browserExecutablePath();
+    if (!executablePath) {
+      throw new Error(
+        "No Chromium-compatible browser was found. Install Google Chrome or run `yarn playwright install --with-deps --only-shell chromium`, or set DOSSIER_CHROME_PATH.",
+      );
+    }
     const launching = chromium
       .launch({
         // Docker gives /dev/shm only 64 MB.
         args: ["--disable-dev-shm-usage"],
+        executablePath,
       })
       .then((launched) => {
         // A crashed or closed browser is replaced on the next render.

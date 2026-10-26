@@ -47,13 +47,15 @@ export const saveAiProvider = action(
     // Saved as typed: a half-typed address is harmless, and the connection test explains a wrong one.
     baseUrl: z.string().trim().max(500),
     model: z.string().trim().max(200),
+    agentModel: z.string().trim().max(200).optional(),
   }),
-  async ({ provider, baseUrl, model }) => {
+  async ({ provider, baseUrl, model, agentModel }) => {
     const current = await loadSettings();
     await saveSettings({
       provider,
       baseUrl: baseUrl || null,
       model: model || null,
+      ...(agentModel === undefined ? {} : { agentModel: agentModel || null }),
       ...(current.provider !== provider ? { apiKeyEnc: null } : {}),
     });
     return { keyState: await currentKeyState() };

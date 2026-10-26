@@ -45,9 +45,11 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
   const [provider, setProvider] = useState(initial.provider);
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl);
   const [model, setModel] = useState(initial.model);
+  const [agentModel, setAgentModel] = useState(initial.agentModel ?? "");
   const [keyState, setKeyState] = useState(initial.keyState);
   const [keyInput, setKeyInput] = useState("");
   const [otherModel, setOtherModel] = useState(false);
+  const [otherAgentModel, setOtherAgentModel] = useState(false);
   const [urlLeft, setUrlLeft] = useState(false);
   const [connection, setConnection] = useState<Connection>({ status: "untested" });
   const [modelList, setModelList] = useState<ModelList>({ loading: true });
@@ -72,7 +74,7 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
   // SET-2: any change to the provider fields means the last test no longer counts.
   const changed = () => setConnection({ status: "untested" });
 
-  const fields = useMemo(() => ({ provider, baseUrl, model }), [provider, baseUrl, model]);
+  const fields = useMemo(() => ({ provider, baseUrl, model, agentModel }), [provider, baseUrl, model, agentModel]);
   const savedServer = useRef(`${initial.provider} ${initial.baseUrl}`);
   const { flush } = useAutosave(fields, async (value) => {
     const result = await track(saveAiProvider(value));
@@ -99,7 +101,9 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
     setProvider(next);
     setBaseUrl(nextOption.defaultUrl);
     setModel(nextOption.defaultModel);
+    setAgentModel(nextOption.defaultAgentModel ?? "");
     setOtherModel(false);
+    setOtherAgentModel(false);
     setUrlLeft(false);
     setKeyInput("");
     changed();
@@ -127,7 +131,7 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
     else setConnection({ status: "failed", message: result.data.message });
   };
 
-  const models = [...new Set([...(modelList.loading ? [] : modelList.models), model].filter(Boolean))];
+  const models = [...new Set([...(modelList.loading ? [] : modelList.models), model, agentModel].filter(Boolean))];
 
   return (
     <>
@@ -231,6 +235,46 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
               autoFocus
               onChange={(event) => {
                 setModel(event.target.value);
+                changed();
+              }}
+              onBlur={flush}
+            />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          <Select
+            label="Agent/subagent model"
+            value={otherAgentModel ? OTHER_MODEL : agentModel}
+            onChange={(event) => {
+              if (event.target.value === OTHER_MODEL) {
+                setOtherAgentModel(true);
+                return;
+              }
+              setOtherAgentModel(false);
+              setAgentModel(event.target.value);
+              changed();
+              setSaveNow((count) => count + 1);
+            }}
+            hint="Used by the scheduled job agent and its subtasks to reduce free-tier requests and token use."
+          >
+            <option value="">Use primary model</option>
+            {models.map((name) => (
+              <option key={`agent-${name}`} value={name}>
+                {name}
+              </option>
+            ))}
+            <option value={OTHER_MODEL}>Other model…</option>
+          </Select>
+          {otherAgentModel && (
+            <Input
+              label="Agent model name"
+              value={agentModel}
+              placeholder="e.g. openai/gpt-oss-20b"
+              spellCheck={false}
+              autoFocus
+              onChange={(event) => {
+                setAgentModel(event.target.value);
                 changed();
               }}
               onBlur={flush}

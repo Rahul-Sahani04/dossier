@@ -31,6 +31,7 @@ describe("stored settings", () => {
       provider: null,
       baseUrl: null,
       model: null,
+      agentModel: null,
       apiKeyEnc: null,
       creativity: "BALANCED",
       strict: true,

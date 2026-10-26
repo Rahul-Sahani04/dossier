@@ -37,7 +37,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
   protected readonly client: OpenAI;
 
   constructor(
-    readonly kind: "OPENAI" | "LOCAL" | "MISTRAL" | "LMSTUDIO",
+    readonly kind: "OPENAI" | "LOCAL" | "MISTRAL" | "LMSTUDIO" | "GROQ",
     private readonly baseURL: string,
     apiKey: string | null,
     model: string | null,
@@ -57,7 +57,9 @@ export class OpenAICompatibleProvider extends BaseProvider {
 
   protected async chat(call: ChatCall): Promise<ChatAnswer> {
     const key = `${this.baseURL} ${call.model}`;
-    let known: Quirks = quirks.get(key) ?? { noTemperature: false, maxCompletionTokens: false, noEffort: false, json: "schema" };
+    let known: Quirks =
+      quirks.get(key) ??
+      { noTemperature: false, maxCompletionTokens: this.kind === "GROQ", noEffort: false, json: "schema" };
     // A 400 or 422 naming a parameter this model doesn't take: adapt and
     // remember, once per parameter.
     for (;;) {
@@ -88,8 +90,11 @@ export class OpenAICompatibleProvider extends BaseProvider {
 
   /** The `reasoning_effort` to send for `call`, if any; none by default, as servers differ in what they take. */
   protected reasoningEffort(call: ChatCall): ReasoningEffort | undefined {
-    void call;
-    return undefined;
+    if (this.kind !== "GROQ") return undefined;
+    if (call.effort) return call.effort;
+    // Keep the high-capability primary model thoughtful, but make the cheaper
+    // scheduled-agent model spend less reasoning budget by default.
+    return this.model?.includes("120b") ? "medium" : "low";
   }
 
   private async send(call: ChatCall, { noTemperature, maxCompletionTokens, noEffort, json }: Quirks): Promise<ChatAnswer> {

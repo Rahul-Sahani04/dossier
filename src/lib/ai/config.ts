@@ -14,20 +14,23 @@ export type AiConfig = {
   provider: AiProvider;
   baseUrl: string;
   model: string | null;
+  /** Optional lower-cost model for scheduled agent work. */
+  agentModel: string | null;
   apiKey: string | null;
   /** Why the saved key can't be used, e.g. DOSSIER_SECRET changed. */
   apiKeyProblem: string | null;
   timeoutMs: number;
 };
 
-export const PROVIDER_DEFAULTS: Record<AiProvider, { baseUrl: string; model: string | null; timeoutSeconds: number }> = {
+export const PROVIDER_DEFAULTS: Record<AiProvider, { baseUrl: string; model: string | null; agentModel: string | null; timeoutSeconds: number }> = {
   // Generous: a local model on a laptop can take minutes for a cover letter.
-  [AiProvider.LOCAL]: { baseUrl: "http://localhost:11434", model: null, timeoutSeconds: 300 },
-  [AiProvider.OPENAI]: { baseUrl: "https://api.openai.com/v1", model: null, timeoutSeconds: 120 },
-  [AiProvider.ANTHROPIC]: { baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5", timeoutSeconds: 120 },
-  [AiProvider.MISTRAL]: { baseUrl: "https://api.mistral.ai/v1", model: "mistral-medium-latest", timeoutSeconds: 120 },
+  [AiProvider.LOCAL]: { baseUrl: "http://localhost:11434", model: null, agentModel: null, timeoutSeconds: 300 },
+  [AiProvider.OPENAI]: { baseUrl: "https://api.openai.com/v1", model: null, agentModel: null, timeoutSeconds: 120 },
+  [AiProvider.ANTHROPIC]: { baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5", agentModel: null, timeoutSeconds: 120 },
+  [AiProvider.MISTRAL]: { baseUrl: "https://api.mistral.ai/v1", model: "mistral-medium-latest", agentModel: null, timeoutSeconds: 120 },
   // As generous as a local model, and loading one can take a while too.
-  [AiProvider.LMSTUDIO]: { baseUrl: "http://host.docker.internal:1234", model: null, timeoutSeconds: 300 },
+  [AiProvider.LMSTUDIO]: { baseUrl: "http://host.docker.internal:1234", model: null, agentModel: null, timeoutSeconds: 300 },
+  [AiProvider.GROQ]: { baseUrl: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", agentModel: "openai/gpt-oss-20b", timeoutSeconds: 120 },
 };
 
 const FROM_ENV: Record<NonNullable<Env["DOSSIER_AI_PROVIDER"]>, AiProvider> = {
@@ -36,18 +39,20 @@ const FROM_ENV: Record<NonNullable<Env["DOSSIER_AI_PROVIDER"]>, AiProvider> = {
   anthropic: AiProvider.ANTHROPIC,
   mistral: AiProvider.MISTRAL,
   lmstudio: AiProvider.LMSTUDIO,
+  groq: AiProvider.GROQ,
 };
 
 type SavedSettings = {
   provider: AiProvider | null;
   baseUrl: string | null;
   model: string | null;
+  agentModel?: string | null;
   apiKeyEnc: string | null;
 };
 
 type AiEnv = Pick<
   Env,
-  "DOSSIER_AI_PROVIDER" | "DOSSIER_AI_URL" | "DOSSIER_AI_MODEL" | "DOSSIER_AI_KEY" | "DOSSIER_AI_TIMEOUT_SECONDS"
+  "DOSSIER_AI_PROVIDER" | "DOSSIER_AI_URL" | "DOSSIER_AI_MODEL" | "DOSSIER_AI_AGENT_MODEL" | "DOSSIER_AI_KEY" | "DOSSIER_AI_TIMEOUT_SECONDS"
 >;
 
 /**
@@ -78,6 +83,7 @@ export function resolveAiConfig(saved: SavedSettings | null, source: AiEnv, secr
     provider,
     baseUrl: (useSaved ? saved!.baseUrl : source.DOSSIER_AI_URL) || defaults.baseUrl,
     model: (useSaved ? saved!.model : source.DOSSIER_AI_MODEL) || defaults.model,
+    agentModel: (useSaved ? saved!.agentModel : source.DOSSIER_AI_AGENT_MODEL) || defaults.agentModel,
     apiKey,
     apiKeyProblem,
     timeoutMs: (source.DOSSIER_AI_TIMEOUT_SECONDS ?? defaults.timeoutSeconds) * 1000,
@@ -87,6 +93,14 @@ export function resolveAiConfig(saved: SavedSettings | null, source: AiEnv, secr
 /** The AI configuration in effect right now. */
 export async function loadAiConfig(): Promise<AiConfig> {
   return resolveAiConfig(await loadSettings(), env);
+}
+
+export type AiRole = "primary" | "agent";
+
+/** The provider for interactive work or for the scheduled agent/subtasks. */
+export async function loadAiConfigFor(role: AiRole = "primary"): Promise<AiConfig> {
+  const config = await loadAiConfig();
+  return role === "agent" && config.agentModel ? { ...config, model: config.agentModel } : config;
 }
 
 /**
@@ -100,6 +114,7 @@ export async function loadAiSettingsView(): Promise<AiSettingsView> {
     provider: config.provider,
     baseUrl: config.baseUrl,
     model: config.model ?? "",
+    agentModel: config.agentModel ?? "",
     keyState: keyStateOf(saved, config),
   };
 }
@@ -126,6 +141,6 @@ export async function isAiUsable(): Promise<boolean> {
   if (!(await isAiConfigured())) return false;
   const config = await loadAiConfig();
   if (!config.model || config.apiKeyProblem) return false;
-  const needsKey = config.provider === AiProvider.ANTHROPIC || config.provider === AiProvider.MISTRAL;
+  const needsKey = config.provider === AiProvider.ANTHROPIC || config.provider === AiProvider.MISTRAL || config.provider === AiProvider.GROQ;
   return !needsKey || Boolean(config.apiKey);
 }

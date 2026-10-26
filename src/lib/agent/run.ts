@@ -129,7 +129,7 @@ export async function runAgentScan({ manual }: { manual: boolean }, context: Job
 
   const toScore = fresh.toSorted(newestFirst).slice(0, settings.agentMaxScores);
   await context.step(`Scoring ${toScore.length} ${toScore.length === 1 ? "posting" : "postings"}`);
-  const [provider, options, profile] = await Promise.all([getAiProvider(), loadTaskOptions(), loadProfile()]);
+  const [provider, options, profile] = await Promise.all([getAiProvider("agent"), loadTaskOptions(), loadProfile()]);
   let scored = 0;
   let queued = 0;
   const kept: string[] = [];

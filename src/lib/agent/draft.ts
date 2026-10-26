@@ -82,11 +82,11 @@ export async function draftCandidate(candidateId: string, context: JobContext): 
     const posting = postingText({ ...found, description });
 
     await context.step(`Reading the posting from ${name}`);
-    const reading = await readPostingJob.run({ posting }, context);
+    const reading = await readPostingJob.run({ posting, aiRole: "agent" }, context);
     await context.step(`Writing the draft for ${name}`);
     const settings = await loadSettings();
     const documents = await writeDocumentsJob.run(
-      { readJobId: context.id, posting, extracted: reading.extracted, match: reading.match, tone: settings.defaultTone, note: "" },
+      { readJobId: context.id, posting, extracted: reading.extracted, match: reading.match, tone: settings.defaultTone, note: "", aiRole: "agent" },
       context,
     );
     // Keep the whole text, so a retry doesn't fetch it again.

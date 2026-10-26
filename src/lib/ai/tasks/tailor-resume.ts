@@ -21,7 +21,7 @@ import {
   type Task,
 } from "./prompt-parts";
 
-export const TAILOR_RESUME_VERSION = "tailor-resume@6";
+export const TAILOR_RESUME_VERSION = "tailor-resume@7";
 
 const answerSchema = z.object({
   summary: z.string(),
@@ -35,16 +35,16 @@ const answerSchema = z.object({
 const INSTRUCTIONS = `You tailor a candidate's resume to one job, as JSON.
 
 - summary: 2–3 sentences in the first person without "I" at the start of every sentence, about the candidate as this job would see them.
-- roles: every role from the profile, by id, with 2–5 bullets each. Lead with what this job cares about, keep each bullet to one line, and start with a verb.
-- projects: every project from the profile, by id, with 1–3 bullets each, written like the roles' bullets: what was built and what it shows that this job cares about.
+- roles: every role from the profile, by id, with 2–5 bullets each. Lead with what this job cares about, keep each bullet to one line, and start with a verb. For a one-page resume, include only the 1–2 roles that best support this job.
+- projects: every project from the profile, by id, with 1–3 bullets each, written like the roles' bullets: what was built and what it shows that this job cares about. For a one-page resume, include only the 1–3 projects that best support this job.
 - skills: the candidate's own skills, most relevant to this job first. Copy their names exactly; you may leave out ones that don't help.
-- education: every entry by id, with its notes shortened or left empty.
+- education: every entry by id, with their notes shortened or left empty. For a one-page resume, include only the 1–2 most relevant entries.
 - The profile's publications go on the resume word for word, so don't answer with them; the summary may mention them.`;
 
 /** SET-9: asked for when "Resume length" has a limit; anything still over is trimmed afterwards (E10-10). */
 function pageFit(maxPages: number | null | undefined): string | null {
   if (maxPages === 1) {
-    return "The resume has to fit on one page: keep the summary to two sentences, give the most relevant roles 3–4 bullets and older roles 2, and keep education and project notes to a few words.";
+    return "The resume has to fit on one page: select only the 1–2 most relevant roles, 1–3 most relevant projects and 1–2 most relevant education entries; keep the summary to two sentences, give the most relevant roles 3–4 bullets and older roles 2, and keep education and project notes to a few words.";
   }
   if (maxPages === 2) {
     return "The resume has to fit on two pages: keep the summary to three sentences, give the most relevant roles 4–5 bullets and older roles 2–3, and keep education and project notes short.";
@@ -93,7 +93,7 @@ export const tailorResume: Task<TailorInput, Unit[]> = async (provider, { profil
     signal: options.signal,
   });
   // The languages line in the resume's language: the chosen one, or the posting's.
-  const units = resumeUnits(profile, answer, documentLabels(options.language ?? extracted.language));
+  const units = resumeUnits(profile, answer, documentLabels(options.language ?? extracted.language), options.maxPages);
   // E6-6: in strict mode, note what the profile and posting don't back.
   return {
     data: options.strict ? guardUnits(units, guardSources(profile, extracted, posting, facts)) : units,
@@ -103,30 +103,38 @@ export const tailorResume: Task<TailorInput, Unit[]> = async (provider, { profil
 
 /**
  * Turns the answer into units, trusting nothing: unknown roles, projects and
- * degrees are dropped, skills must be the profile's own, and a role or
- * project the model skipped keeps its bullets from the profile. The publications and languages
- * come from the profile, publications word for word (#218), and languages with their levels in
- * the words of `labels`.
+ * degrees are dropped, skills must be the profile's own, and skipped entries keep their
+ * profile text unless the one-page selection intentionally leaves them out. Publications and
+ * languages come from the profile, publications word for word (#218), and languages with
+ * their levels in the words of `labels`.
  */
-export function resumeUnits(profile: ProfileData, answer: z.infer<typeof answerSchema>, labels: DocumentLabels = ENGLISH_LABELS): Unit[] {
+export function resumeUnits(
+  profile: ProfileData,
+  answer: z.infer<typeof answerSchema>,
+  labels: DocumentLabels = ENGLISH_LABELS,
+  maxPages?: number | null,
+): Unit[] {
   const roles = new Map(answer.roles.map((role) => [role.id, role.bullets]));
   const projects = new Map(answer.projects.map((project) => [project.id, project.bullets]));
   const notes = new Map(answer.education.map((entry) => [entry.id, entry.notes]));
+  const experience = maxPages === 1 ? pageLimitedEntries(profile.experience, answer.roles.map((role) => role.id), 2) : profile.experience;
+  const projectEntries = maxPages === 1 ? pageLimitedEntries(profile.projects, answer.projects.map((project) => project.id), 3) : profile.projects;
+  const education = maxPages === 1 ? pageLimitedEntries(profile.education, answer.education.map((entry) => entry.id), 2) : profile.education;
   const skills = [
     ...new Set(answer.skills.flatMap((name) => profile.skills.find((skill) => sameName(skill.name, name))?.name ?? [])),
   ];
   const units: Unit[] = [
     { id: "summary", label: "Summary", text: answer.summary.trim() },
-    ...profile.experience.map((entry) => {
+    ...experience.map((entry) => {
       const bullets = (roles.get(entry.id) ?? entry.bullets.split("\n")).map((line) => line.trim()).filter(Boolean);
       return { id: `experience:${entry.id}`, label: `${entry.company || entry.role} role`, text: bullets.join("\n") };
     }),
-    ...profile.projects.map((entry) => {
+    ...projectEntries.map((entry) => {
       const bullets = (projects.get(entry.id) ?? entry.bullets.split("\n")).map((line) => line.trim()).filter(Boolean);
       return { id: `project:${entry.id}`, label: `${entry.name || "Untitled"} project`, text: bullets.join("\n") };
     }),
     { id: "skills", label: "Skills", text: skills.join(" · ") },
-    ...profile.education.map((entry) => ({
+    ...education.map((entry) => ({
       id: `education:${entry.id}`,
       label: entry.degree || entry.school,
       text: (notes.get(entry.id) ?? entry.notes).trim(),
@@ -143,4 +151,17 @@ export function resumeUnits(profile: ProfileData, answer: z.infer<typeof answerS
     },
   ];
   return unitsSchema.parse(units);
+}
+
+/**
+ * For a one-page resume, keep the model's relevant-first selection while
+ * retaining a small recent fallback if it returned no valid ids.
+ */
+function pageLimitedEntries<T extends { id: string }>(entries: T[], requestedIds: string[], maximum: number): T[] {
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const selected = requestedIds.flatMap((id) => {
+    const entry = byId.get(id);
+    return entry ? [entry] : [];
+  });
+  return (selected.length > 0 ? selected : entries.slice(0, 1)).slice(0, maximum);
 }

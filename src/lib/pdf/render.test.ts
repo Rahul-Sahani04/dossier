@@ -5,14 +5,16 @@ const fake = vi.hoisted(() => {
   type Handler = () => void;
   const state = {
     launches: 0,
+    launchPaths: [] as string[],
     printing: 0,
     maxPrinting: 0,
     releases: [] as (() => void)[],
     routes: [] as string[],
     disconnect: undefined as Handler | undefined,
   };
-  const launch = async () => {
+  const launch = async (options: { executablePath?: string }) => {
     state.launches += 1;
+    state.launchPaths.push(options.executablePath ?? "");
     return {
       on: (event: string, handler: Handler) => {
         if (event === "disconnected") state.disconnect = handler;
@@ -46,7 +48,8 @@ const fake = vi.hoisted(() => {
   return { state, launch };
 });
 
-vi.mock("playwright-core", () => ({ chromium: { launch: fake.launch } }));
+vi.mock("playwright-core", () => ({ chromium: { executablePath: () => "/fake/playwright-chromium", launch: fake.launch } }));
+vi.mock("node:fs", () => ({ existsSync: () => true }));
 vi.mock("@/lib/env", () => ({ env: { DOSSIER_SECRET: "a".repeat(32) } }));
 
 const { MAX_CONCURRENT_RENDERS, renderPdf } = await import("./render");
@@ -73,6 +76,7 @@ describe("renderPdf", () => {
       "continue http://localhost:3000/_next/static/app.css",
       "abort https://fonts.example/font.woff2",
     ]);
+    expect(fake.state.launchPaths).toEqual(["/fake/playwright-chromium"]);
   });
 
   it("reuses one browser and prints at most two pages at once, queueing the rest", async () => {

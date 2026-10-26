@@ -95,6 +95,14 @@ describe("OpenAICompatibleProvider", () => {
     expect(requests[0].body).toMatchObject({ model: "gpt-x", temperature: 0.9, max_tokens: 4096 });
   });
 
+  it("sends Groq reasoning effort for the GPT OSS models", async () => {
+    const requests = stubFetch(() => openaiChat("Hello!"));
+    const provider = new OpenAICompatibleProvider("GROQ", "https://api.groq.com/openai/v1", "gsk-test", "openai/gpt-oss-20b", 60_000);
+    expect(await provider.complete({ ...ask, effort: "low" })).toBe("Hello!");
+    expect(requests[0].body).toMatchObject({ model: "openai/gpt-oss-20b", reasoning_effort: "low", max_completion_tokens: 4096 });
+    expect(requests[0].body).not.toHaveProperty("max_tokens");
+  });
+
   it("asks for a strict JSON schema", async () => {
     const requests = stubFetch(() => openaiChat('{"name":"Jane","years":9}'));
     const provider = new OpenAICompatibleProvider("OPENAI", "https://api.example.com/v1", "sk-test", "gpt-x", 60_000);

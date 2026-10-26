@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { Tone } from "@/generated/prisma/enums";
 import { getAiProvider } from "@/lib/ai";
+import type { AiRole } from "@/lib/ai/config";
 import { loadTaskOptions } from "@/lib/ai/task-options";
 import { tailorResume, writeCoverLetter } from "@/lib/ai/tasks";
 import { extractedSchema, matchSchema, unitsSchema } from "@/lib/application-data";
@@ -29,11 +30,12 @@ export const writeDocumentsJob = defineJob({
     match: matchSchema,
     tone: z.enum(Tone),
     note: z.string().max(2000),
+    aiRole: z.enum(["primary", "agent"]).optional(),
   }),
   result: z.object({ resume: unitsSchema, resumeWith: z.string(), letter: unitsSchema, letterWith: z.string() }),
-  async run({ posting, extracted, match, tone, note }, { step, signal }) {
+  async run({ posting, extracted, match, tone, note, aiRole = "primary" }, { step, signal }) {
     await step(WRITE_DOCUMENTS_STEPS[0]);
-    const [provider, options, profile] = await Promise.all([getAiProvider(), loadTaskOptions(), loadProfile()]);
+    const [provider, options, profile] = await Promise.all([getAiProvider(aiRole as AiRole), loadTaskOptions(), loadProfile()]);
     // "Anything I should know?" is the application's first fact (APP-15).
     const facts = note.trim() ? [note.trim()] : [];
     const resume = await tailorResume(provider, { profile, extracted, match, facts, posting }, { ...options, signal });

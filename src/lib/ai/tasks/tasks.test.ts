@@ -217,7 +217,7 @@ describe("tailorResume", () => {
 
   it("returns units, keeping only real roles and the profile's own skills (APP-4)", async () => {
     const { data, promptVersion } = await tailorResume(model(answer), { profile, extracted, match: null, facts: [], posting }, options);
-    expect(promptVersion).toBe("tailor-resume@6");
+    expect(promptVersion).toBe("tailor-resume@7");
     expect(data.map((unit) => unit.id)).toEqual([
       "summary",
       "experience:e1",
@@ -273,6 +273,21 @@ describe("tailorResume", () => {
     expect(await system(1)).toMatch(/has to fit on one page/);
     expect(await system(2)).toMatch(/has to fit on two pages/);
     expect(await system(null)).not.toMatch(/has to fit/);
+  });
+
+  it("keeps only the most relevant profile entries for a one-page resume", async () => {
+    const { data } = await tailorResume(
+      model({
+        summary: "Software developer.",
+        roles: [{ id: "e1", bullets: ["Built reliable services"] }],
+        projects: [{ id: "p1", bullets: ["Built a relevant API"] }],
+        skills: ["Figma", "Design systems"],
+        education: [{ id: "d1", notes: "Relevant degree" }],
+      }),
+      { profile, extracted, match: null, facts: [], posting },
+      { ...options, maxPages: 1 },
+    );
+    expect(data.map((unit) => unit.id)).toEqual(["summary", "experience:e1", "project:p1", "skills", "education:d1", "publication:u1", "languages"]);
   });
 
   it("words creativity for every provider, and relaxes the rules when strict mode is off", async () => {
