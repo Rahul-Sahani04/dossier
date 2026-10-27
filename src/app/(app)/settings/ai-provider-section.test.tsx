@@ -15,7 +15,7 @@ vi.mock("./actions", () => ({
 }));
 vi.mock("@/components/toast", () => ({ toast: vi.fn(), toastResult: (result: unknown) => result }));
 
-const local: AiSettingsView = { provider: "LOCAL", baseUrl: "http://ollama:11434", model: "qwen2.5:3b", agentModel: "", keyState: "none" };
+const local: AiSettingsView = { provider: "LOCAL", baseUrl: "http://ollama:11434", model: "qwen2.5:3b", agentModel: "", providerModels: {}, keyState: "none" };
 
 beforeEach(() => {
   vi.mocked(saveAiProvider).mockReset().mockResolvedValue({ ok: true, data: { keyState: "none" } });
@@ -67,6 +67,13 @@ describe("AiProviderSection", () => {
     await waitFor(() =>
       expect(saveAiProvider).toHaveBeenCalledWith({ provider: "MISTRAL", baseUrl: "https://api.mistral.ai/v1", model: "mistral-medium-latest", agentModel: "" }),
     );
+  });
+
+  it("restores a provider's saved primary and agent models when switching back", async () => {
+    render(<AiProviderSection initial={{ ...local, providerModels: { GROQ: { model: "saved-groq", agentModel: "saved-groq-agent" } } }} />);
+    await userEvent.click(screen.getByRole("radio", { name: "Groq" }));
+    expect(screen.getByLabelText("Model")).toHaveValue("saved-groq");
+    expect(screen.getByLabelText("Agent/subagent model")).toHaveValue("saved-groq-agent");
   });
 
   it("fills in LM Studio on the Docker host, with an optional token and no note about data leaving (#210)", async () => {

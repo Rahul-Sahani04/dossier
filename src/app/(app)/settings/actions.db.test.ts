@@ -72,6 +72,19 @@ describe("saveAiProvider", () => {
     expect(await saveAiProvider({ provider: "OPENAI", baseUrl: "https://llm.example/v1", model: "" })).toMatchObject({ data: { keyState: "none" } });
     expect(await settings()).toMatchObject({ provider: "OPENAI", model: null, apiKeyEnc: null });
   });
+
+  it("keeps each provider's primary and agent model preferences when switching", async () => {
+    await saveAiProvider({ provider: "GROQ", baseUrl: "https://api.groq.com/openai/v1", model: "groq-primary", agentModel: "groq-agent" });
+    await saveAiProvider({ provider: "NIM", baseUrl: "https://integrate.api.nvidia.com/v1", model: "nim-primary", agentModel: "nim-agent" });
+    await saveAiProvider({ provider: "GROQ", baseUrl: "https://api.groq.com/openai/v1", model: "groq-primary", agentModel: "groq-agent" });
+    expect(await settings()).toMatchObject({
+      provider: "GROQ",
+      aiModels: {
+        GROQ: { model: "groq-primary", agentModel: "groq-agent" },
+        NIM: { model: "nim-primary", agentModel: "nim-agent" },
+      },
+    });
+  });
 });
 
 describe("saveApiKey", () => {

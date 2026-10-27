@@ -51,11 +51,22 @@ export const saveAiProvider = action(
   }),
   async ({ provider, baseUrl, model, agentModel }) => {
     const current = await loadSettings();
+    const activeConfig = await loadAiConfig();
+    const aiModels = { ...current.aiModels };
+    const activeProvider = current.provider ?? activeConfig.provider;
+    if (activeProvider !== provider) {
+      aiModels[activeProvider] = {
+        model: current.provider ? current.model ?? "" : activeConfig.model ?? "",
+        agentModel: current.provider ? current.agentModel ?? "" : activeConfig.agentModel ?? "",
+      };
+    }
+    aiModels[provider] = { model, agentModel: agentModel ?? "" };
     await saveSettings({
       provider,
       baseUrl: baseUrl || null,
       model: model || null,
       ...(agentModel === undefined ? {} : { agentModel: agentModel || null }),
+      aiModels,
       ...(current.provider !== provider ? { apiKeyEnc: null } : {}),
     });
     return { keyState: await currentKeyState() };

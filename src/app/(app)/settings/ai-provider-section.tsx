@@ -46,6 +46,7 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl);
   const [model, setModel] = useState(initial.model);
   const [agentModel, setAgentModel] = useState(initial.agentModel ?? "");
+  const [providerModels, setProviderModels] = useState(initial.providerModels ?? {});
   const [keyState, setKeyState] = useState(initial.keyState);
   const [keyInput, setKeyInput] = useState("");
   const [otherModel, setOtherModel] = useState(false);
@@ -80,6 +81,7 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
     const result = await track(saveAiProvider(value));
     if (result.ok) {
       setKeyState(result.data.keyState);
+      setProviderModels((current) => ({ ...current, [value.provider]: { model: value.model, agentModel: value.agentModel ?? "" } }));
       // A different server may offer different models.
       const server = `${value.provider} ${value.baseUrl}`;
       if (server !== savedServer.current) {
@@ -98,10 +100,11 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
 
   const chooseProvider = (next: AiProvider) => {
     const nextOption = providerOption(next);
+    const saved = providerModels[next];
     setProvider(next);
     setBaseUrl(nextOption.defaultUrl);
-    setModel(nextOption.defaultModel);
-    setAgentModel(nextOption.defaultAgentModel ?? "");
+    setModel(saved?.model ?? nextOption.defaultModel);
+    setAgentModel(saved?.agentModel ?? nextOption.defaultAgentModel ?? "");
     setOtherModel(false);
     setOtherAgentModel(false);
     setUrlLeft(false);

@@ -63,14 +63,23 @@ describe("resolveAiConfig", () => {
     });
   });
 
-  it("uses Groq's primary model and a smaller agent model", () => {
+  it("uses Groq's 120b model for primary and agent work", () => {
     expect(resolveAiConfig(nothingSaved, { DOSSIER_AI_PROVIDER: "groq", DOSSIER_AI_KEY: "gsk-test" })).toMatchObject({
       provider: "GROQ",
       baseUrl: "https://api.groq.com/openai/v1",
       model: "openai/gpt-oss-120b",
-      agentModel: "openai/gpt-oss-20b",
+       agentModel: "openai/gpt-oss-120b",
       apiKey: "gsk-test",
     });
+  });
+
+  it("uses the remembered model for the selected provider", () => {
+    expect(
+      resolveAiConfig(
+        { ...nothingSaved, provider: "GROQ", model: "old", agentModel: "old", aiModels: { GROQ: { model: "saved-primary", agentModel: "saved-agent" } } },
+        { DOSSIER_AI_KEY: "gsk-test" },
+      ),
+    ).toMatchObject({ model: "saved-primary", agentModel: "saved-agent" });
   });
 
   it("prefers what's saved in Settings, with its own key", () => {
@@ -130,7 +139,7 @@ describe("fallbackAiConfigs", () => {
       DOSSIER_AI_GOOGLE_KEY: "google-key",
     } as Parameters<typeof fallbackAiConfigs>[1]);
     expect(fallbacks.map((config) => [config.provider, config.model, config.apiKey])).toEqual([
-      ["NIM", "meta/llama-3.1-8b-instruct", "nim-key"],
+      ["NIM", "nvidia/nemotron-3.5-super-vl-120b-a12b", "nim-key"],
       ["GOOGLE_AI_STUDIO", "gemini-2.5-flash", "google-key"],
     ]);
   });

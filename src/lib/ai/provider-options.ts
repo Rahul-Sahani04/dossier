@@ -96,7 +96,7 @@ export const PROVIDER_OPTIONS: readonly {
     defaultUrl: "https://api.groq.com/openai/v1",
     urlPlaceholder: "https://api.groq.com/openai/v1",
     defaultModel: "openai/gpt-oss-120b",
-    defaultAgentModel: "openai/gpt-oss-20b",
+    defaultAgentModel: "openai/gpt-oss-120b",
     apiKey: { label: "API key" },
   },
   {
@@ -108,7 +108,8 @@ export const PROVIDER_OPTIONS: readonly {
     local: false,
     defaultUrl: "https://integrate.api.nvidia.com/v1",
     urlPlaceholder: "https://integrate.api.nvidia.com/v1",
-    defaultModel: "meta/llama-3.1-8b-instruct",
+    defaultModel: "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    defaultAgentModel: "nvidia/nemotron-3.5-super-vl-120b-a12b",
     apiKey: { label: "NVIDIA API key" },
   },
   {
@@ -142,5 +143,6 @@ export type AiSettingsView = {
   baseUrl: string;
   model: string;
   agentModel: string;
+  providerModels?: Partial<Record<AiProvider, { model: string; agentModel: string }>>;
   keyState: KeyState;
 };

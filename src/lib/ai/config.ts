@@ -32,8 +32,8 @@ export const PROVIDER_DEFAULTS: Record<AiProvider, { baseUrl: string; model: str
   [AiProvider.MISTRAL]: { baseUrl: "https://api.mistral.ai/v1", model: "mistral-medium-latest", agentModel: null, timeoutSeconds: 120 },
   // As generous as a local model, and loading one can take a while too.
   [AiProvider.LMSTUDIO]: { baseUrl: "http://host.docker.internal:1234", model: null, agentModel: null, timeoutSeconds: 300 },
-  [AiProvider.GROQ]: { baseUrl: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", agentModel: "openai/gpt-oss-20b", timeoutSeconds: 120 },
-  [AiProvider.NIM]: { baseUrl: "https://integrate.api.nvidia.com/v1", model: "meta/llama-3.1-8b-instruct", agentModel: null, timeoutSeconds: 120 },
+  [AiProvider.GROQ]: { baseUrl: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", agentModel: "openai/gpt-oss-120b", timeoutSeconds: 120 },
+  [AiProvider.NIM]: { baseUrl: "https://integrate.api.nvidia.com/v1", model: "nvidia/nemotron-3.5-super-vl-120b-a12b", agentModel: "nvidia/nemotron-3.5-super-vl-120b-a12b", timeoutSeconds: 120 },
   [AiProvider.GOOGLE_AI_STUDIO]: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.5-flash", agentModel: "gemini-2.5-flash-lite", timeoutSeconds: 120 },
 };
 
@@ -54,6 +54,7 @@ type SavedSettings = {
   model: string | null;
   agentModel?: string | null;
   apiKeyEnc: string | null;
+  aiModels?: Record<string, { model: string; agentModel: string }>;
 };
 
 type AiEnv = Pick<
@@ -84,6 +85,7 @@ export function resolveAiConfig(saved: SavedSettings | null, source: AiEnv, secr
   const useSaved = Boolean(saved?.provider);
   const provider = (useSaved ? saved!.provider : envProvider) ?? AiProvider.LOCAL;
   const defaults = PROVIDER_DEFAULTS[provider];
+  const savedModels = useSaved ? saved?.aiModels?.[provider] : undefined;
 
   let apiKey: string | null = null;
   let apiKeyProblem: string | null = null;
@@ -101,8 +103,8 @@ export function resolveAiConfig(saved: SavedSettings | null, source: AiEnv, secr
   return {
     provider,
     baseUrl: (useSaved ? saved!.baseUrl : source.DOSSIER_AI_URL) || defaults.baseUrl,
-    model: (useSaved ? saved!.model : source.DOSSIER_AI_MODEL) || defaults.model,
-    agentModel: (useSaved ? saved!.agentModel : source.DOSSIER_AI_AGENT_MODEL) || defaults.agentModel,
+    model: savedModels?.model || (useSaved ? saved!.model : source.DOSSIER_AI_MODEL) || defaults.model,
+    agentModel: savedModels?.agentModel || (useSaved ? saved!.agentModel : source.DOSSIER_AI_AGENT_MODEL) || defaults.agentModel,
     apiKey,
     apiKeyProblem,
     timeoutMs: (source.DOSSIER_AI_TIMEOUT_SECONDS ?? defaults.timeoutSeconds) * 1000,
@@ -128,7 +130,7 @@ export async function loadAiConfigFor(role: AiRole = "primary"): Promise<AiConfi
  * separate from the selected provider's saved key, so switching never sends
  * one vendor's credential to another vendor.
  */
-export function fallbackAiConfigs(primary: AiConfig, source: AiEnv, role: AiRole = "primary"): AiConfig[] {
+export function fallbackAiConfigs(primary: AiConfig, source: AiEnv, role: AiRole = "primary", savedModels: Record<string, { model: string; agentModel: string }> = {}): AiConfig[] {
   const requested = source.DOSSIER_AI_FALLBACKS?.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
   const names = requested?.length ? requested : primary.provider === AiProvider.GROQ ? ["nim", "google-ai-studio"] : [];
   const seen = new Set<AiProvider>([primary.provider]);
@@ -139,8 +141,9 @@ export function fallbackAiConfigs(primary: AiConfig, source: AiEnv, role: AiRole
     const defaults = PROVIDER_DEFAULTS[provider];
     const key = provider === AiProvider.NIM ? source.DOSSIER_AI_NIM_KEY : source.DOSSIER_AI_GOOGLE_KEY;
     if (!key) continue;
-    const model = provider === AiProvider.NIM ? source.DOSSIER_AI_NIM_MODEL || defaults.model : source.DOSSIER_AI_GOOGLE_MODEL || defaults.model;
-    const agentModel = defaults.agentModel;
+    const preference = savedModels[provider];
+    const model = preference?.model || (provider === AiProvider.NIM ? source.DOSSIER_AI_NIM_MODEL || defaults.model : source.DOSSIER_AI_GOOGLE_MODEL || defaults.model);
+    const agentModel = preference?.agentModel || defaults.agentModel;
     seen.add(provider);
     configs.push({
       provider,
@@ -157,8 +160,10 @@ export function fallbackAiConfigs(primary: AiConfig, source: AiEnv, role: AiRole
 }
 
 export async function loadAiConfigsFor(role: AiRole = "primary"): Promise<AiConfig[]> {
-  const primary = await loadAiConfigFor(role);
-  return [primary, ...fallbackAiConfigs(primary, env, role)];
+  const saved = await loadSettings();
+  const primaryConfig = resolveAiConfig(saved, env);
+  const primary = role === "agent" && primaryConfig.agentModel ? { ...primaryConfig, model: primaryConfig.agentModel } : primaryConfig;
+  return [primary, ...fallbackAiConfigs(primary, env, role, saved.aiModels)];
 }
 
 /**
@@ -173,6 +178,7 @@ export async function loadAiSettingsView(): Promise<AiSettingsView> {
     baseUrl: config.baseUrl,
     model: config.model ?? "",
     agentModel: config.agentModel ?? "",
+    providerModels: saved.aiModels ?? {},
     keyState: keyStateOf(saved, config),
   };
 }
