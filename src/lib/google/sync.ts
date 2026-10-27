@@ -64,6 +64,11 @@ async function knownThreads(): Promise<Map<string, string>> {
   ]);
 }
 
+async function knownOutreachThreads(): Promise<Map<string, string>> {
+  const rows = await prisma.outreach.findMany({ where: { threadId: { not: null } }, select: { id: true, threadId: true } });
+  return new Map(rows.map((row) => [row.threadId!, row.id]));
+}
+
 export type SyncResult = { fetched: number; kept: number; read: number };
 
 /**
@@ -103,7 +108,7 @@ async function runSync(historyId: string | null, ownAddress: string, scope: "kno
   const counts = { fetched: fresh.length, kept: 0, read: 0 };
   if (fresh.length === 0) return { historyId: next, counts };
 
-  const [applications, threads, aiReady] = await Promise.all([matchables(), knownThreads(), isAiConfigured()]);
+  const [applications, threads, outreachThreads, aiReady] = await Promise.all([matchables(), knownThreads(), knownOutreachThreads(), isAiConfigured()]);
   const kept: string[] = [];
   // Oldest first, so a thread's first mail links it for the ones after.
   const mails: ReadMail[] = [];
@@ -115,9 +120,10 @@ async function runSync(historyId: string | null, ownAddress: string, scope: "kno
     const outgoing = mail.labels.includes("SENT") || from.address === ownAddress.toLowerCase();
     if (mail.labels.some((label) => NOISE_LABELS.includes(label))) continue;
     const match = matchMail({ threadId: mail.threadId, fromName: from.name, fromAddress: from.address, subject: mail.subject }, applications, threads);
+    const outreachId = outreachThreads.get(mail.threadId) ?? null;
     // Your own mail only counts in a thread Dossier knows; other mail by the setting.
-    if (!match && (outgoing || scope === "known" || !mail.labels.includes("INBOX"))) continue;
-    if (outgoing && match?.by !== "thread") continue;
+    if (!match && !outreachId && (outgoing || scope === "known" || !mail.labels.includes("INBOX"))) continue;
+    if (outgoing && !outreachId && match?.by !== "thread") continue;
 
     const created = await prisma.emailMessage.upsert({
       where: { gmailId: mail.id },
@@ -125,6 +131,7 @@ async function runSync(historyId: string | null, ownAddress: string, scope: "kno
         gmailId: mail.id,
         threadId: mail.threadId,
         applicationId: match?.applicationId ?? null,
+        outreachId,
         direction: outgoing ? EmailDirection.OUTGOING : EmailDirection.INCOMING,
         fromName: from.name,
         fromAddress: from.address,

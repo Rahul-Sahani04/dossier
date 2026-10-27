@@ -728,6 +728,12 @@ enum StartupStatus {
   DISMISSED
 }
 
+/// A reviewable message to a startup outside a specific application.
+enum OutreachStatus {
+  DRAFT
+  SENT
+}
+
 /// A startup that's hiring (#222): a YC startup's job post on Hacker News, or
 /// a post in Hacker News' monthly "Who is hiring?" thread, with the addresses
 /// it publishes for applications and how well it fits the profile. Kept
@@ -777,11 +783,36 @@ model Startup {
   /// The application started from it ("Write to them"); deleting the application keeps the startup.
   applicationId      String?       @unique
   application        Application?  @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  outreaches         Outreach[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
   @@unique([source, externalId])
   @@index([status, score])
+}
+
+/// A user-reviewed job-search message to a startup. It is separate from an
+/// Application because speculative outreach is not itself an application.
+model Outreach {
+  id          String        @id @default(cuid())
+  startupId   String
+  startup     Startup       @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  recipient   String
+  contactType String        @default("General")
+  sourceUrl   String        @default("")
+  subject     String        @default("")
+  body        String        @default("")
+  status      OutreachStatus @default(DRAFT)
+  gmailId     String?       @unique
+  threadId    String?
+  sentAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  emails      EmailMessage[]
+
+  @@unique([startupId, recipient])
+  @@index([status, updatedAt])
 }
 
 /// A startup removed with "Remove and don't bring back" (#222): only a
@@ -840,6 +871,8 @@ model EmailMessage {
   /// Deleting the application deletes its mail, as it does its documents.
   applicationId   String?
   application     Application?       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  outreachId      String?
+  outreach        Outreach?          @relation(fields: [outreachId], references: [id], onDelete: Cascade)
   direction       EmailDirection
   fromName        String             @default("")
   fromAddress     String             @default("")
@@ -875,6 +908,7 @@ model EmailMessage {
 
   @@index([threadId])
   @@index([applicationId, sentAt])
+  @@index([outreachId, sentAt])
   @@index([sentAt])
 }
 

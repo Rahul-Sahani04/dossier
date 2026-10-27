@@ -28,7 +28,7 @@ import {
   type StartupView,
 } from "@/lib/startups/types";
 
-import { lookUpStartupAddresses, refreshStartupsNow, removeStartupForGood, saveStartupNotes, setStartupStatus } from "./actions";
+import { lookUpStartupAddresses, refreshStartupsNow, removeStartupForGood, saveStartupNotes, setStartupStatus, startStartupOutreach } from "./actions";
 
 export type StartupsScreenProps = {
   filter: StartupFilter;
@@ -289,6 +289,15 @@ function StartupCard({ startup: initial, headline, aiReady, today }: { startup: 
     if (toastResult(await removeStartupForGood({ id: startup.id })).ok) router.refresh();
   };
 
+  const startOutreach = async () => {
+    if (busy) return;
+    setBusy("outreach");
+    const result = toastResult(await startStartupOutreach({ id: startup.id }));
+    setBusy(null);
+    if (!result.ok) return;
+    router.push(`/outreach/${result.data}`);
+  };
+
   return (
     <article aria-label={startup.company} className="flex flex-col gap-4 rounded-panel border border-line-card bg-card px-6 py-5">
       <div className="flex items-start gap-4">
@@ -339,6 +348,11 @@ function StartupCard({ startup: initial, headline, aiReady, today }: { startup: 
             Choose an AI provider to write an application
           </Link>
         ) : null}
+        {!startup.applicationId && !blocked && startup.emails.some((email) => !email.onRequest) && (
+          <Button size="sm" variant="secondary" aria-disabled={busy !== null || undefined} onClick={() => void startOutreach()}>
+            {busy === "outreach" ? "Preparing…" : "Draft outreach"}
+          </Button>
+        )}
         {startup.website && !blocked && (
           <Button size="sm" variant="secondary" aria-disabled={busy !== null || undefined} onClick={() => void lookUp(false)}>
             {busy === "emails" ? "Looking…" : startup.emailsCheckedAt ? "Look on their site again" : "Find addresses on their site"}

@@ -77,7 +77,7 @@ const jsonList = (value: unknown) => (Array.isArray(value) ? value : []) as Pris
  * install's own settings (the usage ping's) stay as they are.
  */
 export async function importExport(db: PrismaClient, data: DossierExport): Promise<void> {
-  const { profile, themes, settings, applications, postings, searches, agentCandidates, startups, startupBlocks, apiKey, jobSourceKeys } = data;
+  const { profile, themes, settings, applications, postings, searches, agentCandidates, startups, startupBlocks, outreaches, apiKey, jobSourceKeys } = data;
   const fromFile: Record<string, string | null> = {
     apiKeyEnc: apiKey ? encryptApiKey(apiKey) : null,
     jsearchKeyEnc: jobSourceKeys?.jsearch ? encryptSecret(JOB_SOURCE_KEY, jobSourceKeys.jsearch) : null,
@@ -210,6 +210,11 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
           reasons: jsonList(startup.reasons),
           applicationId: startup.applicationId && applicationIds.has(startup.applicationId) ? startup.applicationId : null,
         })),
+      });
+      const startupIds = new Set(startups.map((startup) => startup.id));
+      await tx.outreach.createMany({
+        data: outreaches.filter((outreach) => startupIds.has(outreach.startupId)).map((outreach) => ({ ...outreach })),
+        skipDuplicates: true,
       });
       await tx.startupBlock.createMany({ data: startupBlocks, skipDuplicates: true });
     },

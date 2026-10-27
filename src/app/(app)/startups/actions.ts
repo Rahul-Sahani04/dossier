@@ -6,6 +6,7 @@ import { StartupStatus } from "@/generated/prisma/enums";
 import { action, ActionError } from "@/lib/action";
 import { startStartupsRefresh } from "@/lib/startups/refresh";
 import { lookUpStartup, removeStartup, updateStartup } from "@/lib/startups/store";
+import { createStartupOutreach } from "@/lib/outreach";
 
 // The Startups screen's actions (#222). Nothing here sends anything: the
 // user writes to a startup from New application or their own mail.
@@ -31,6 +32,15 @@ export const lookUpStartupAddresses = action(z.object({ id: startupId, people: z
   const startup = await lookUpStartup(id, { people });
   if (!startup) throw new ActionError(GONE);
   return startup;
+});
+
+/** Starts a separate, reviewable outreach draft from a published address. */
+export const startStartupOutreach = action(z.object({ id: startupId }), async ({ id }) => {
+  try {
+    return await createStartupOutreach(id);
+  } catch (error) {
+    throw new ActionError(error instanceof Error ? error.message : "That outreach could not be created.");
+  }
 });
 
 /** Notes on a startup, kept as typed. */
