@@ -26,6 +26,7 @@ export class LocalProvider implements AIProvider {
     host: string,
     readonly model: string | null,
     private readonly timeoutMs: number,
+    private readonly retryCount = 2,
   ) {
     this.host = host.replace(/\/+$/, "").replace(/\/v1$/, "");
   }
@@ -44,8 +45,8 @@ export class LocalProvider implements AIProvider {
       flavours.set(this.host, flavour);
     }
     return flavour === "ollama"
-      ? new OllamaProvider(this.host, this.model, this.timeoutMs)
-      : new OpenAICompatibleProvider("LOCAL", `${this.host}/v1`, null, this.model, this.timeoutMs);
+      ? new OllamaProvider(this.host, this.model, this.timeoutMs, this.retryCount)
+      : new OpenAICompatibleProvider("LOCAL", `${this.host}/v1`, null, this.model, this.timeoutMs, this.retryCount);
   }
 
   complete(request: CompletionRequest): Promise<string>;

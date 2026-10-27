@@ -32,8 +32,9 @@ export class MistralProvider extends OpenAICompatibleProvider {
     private readonly apiKey: string | null,
     model: string | null,
     timeoutMs: number,
+    retryCount = 2,
   ) {
-    super("MISTRAL", baseURL, apiKey, model, timeoutMs);
+    super("MISTRAL", baseURL, apiKey, model, timeoutMs, retryCount);
   }
 
   protected override async chat(call: ChatCall): Promise<ChatAnswer> {

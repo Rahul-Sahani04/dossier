@@ -43,9 +43,10 @@ export class LmStudioProvider extends OpenAICompatibleProvider {
     private readonly apiKey: string | null,
     model: string | null,
     timeoutMs: number,
+    retryCount = 2,
   ) {
     const root = address.replace(/\/+$/, "").replace(/(\/api)?\/v1$/, "");
-    super("LMSTUDIO", `${root}/v1`, apiKey, model, timeoutMs);
+    super("LMSTUDIO", `${root}/v1`, apiKey, model, timeoutMs, retryCount);
     this.root = root;
     this.api = apiKey ? keyGuardedFetch() : fetch;
   }

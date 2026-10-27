@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { encryptApiKey } from "./api-key";
-import { isAiUsable, loadAiConfigFor, resolveAiConfig } from "./config";
+import { fallbackAiConfigs, isAiUsable, loadAiConfigFor, resolveAiConfig } from "./config";
 import { AiError } from "./errors";
 import { createProvider } from "./index";
 
@@ -23,6 +23,7 @@ describe("resolveAiConfig", () => {
       apiKey: null,
       apiKeyProblem: null,
       timeoutMs: 300_000,
+      retryCount: 2,
     });
   });
 
@@ -94,13 +95,15 @@ describe("resolveAiConfig", () => {
 
 describe("createProvider", () => {
   it("picks the implementation for the provider", () => {
-    const base = { baseUrl: "http://x", model: "m", agentModel: null, apiKey: "k", apiKeyProblem: null, timeoutMs: 1000 };
+    const base = { baseUrl: "http://x", model: "m", agentModel: null, apiKey: "k", apiKeyProblem: null, timeoutMs: 1000, retryCount: 2 };
     expect(createProvider({ ...base, provider: "LOCAL" }).kind).toBe("LOCAL");
     expect(createProvider({ ...base, provider: "OPENAI" }).kind).toBe("OPENAI");
     expect(createProvider({ ...base, provider: "ANTHROPIC" }).kind).toBe("ANTHROPIC");
     expect(createProvider({ ...base, provider: "MISTRAL" }).kind).toBe("MISTRAL");
     expect(createProvider({ ...base, provider: "LMSTUDIO" }).kind).toBe("LMSTUDIO");
     expect(createProvider({ ...base, provider: "GROQ" }).kind).toBe("GROQ");
+    expect(createProvider({ ...base, provider: "NIM" }).kind).toBe("NIM");
+    expect(createProvider({ ...base, provider: "GOOGLE_AI_STUDIO" }).kind).toBe("GOOGLE_AI_STUDIO");
   });
 });
 
@@ -115,6 +118,21 @@ describe("loadAiConfigFor", () => {
     };
     expect((await loadAiConfigFor("primary")).model).toBe("openai/gpt-oss-120b");
     expect((await loadAiConfigFor("agent")).model).toBe("openai/gpt-oss-20b");
+  });
+});
+
+describe("fallbackAiConfigs", () => {
+  it("uses NVIDIA then Google after Groq when their environment keys are present", () => {
+    const primary = resolveAiConfig(nothingSaved, { DOSSIER_AI_PROVIDER: "groq", DOSSIER_AI_KEY: "groq-key" });
+    const fallbacks = fallbackAiConfigs(primary, {
+      DOSSIER_AI_FALLBACKS: "nim,google-ai-studio",
+      DOSSIER_AI_NIM_KEY: "nim-key",
+      DOSSIER_AI_GOOGLE_KEY: "google-key",
+    } as Parameters<typeof fallbackAiConfigs>[1]);
+    expect(fallbacks.map((config) => [config.provider, config.model, config.apiKey])).toEqual([
+      ["NIM", "meta/llama-3.1-8b-instruct", "nim-key"],
+      ["GOOGLE_AI_STUDIO", "gemini-2.5-flash", "google-key"],
+    ]);
   });
 });
 

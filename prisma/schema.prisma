@@ -308,6 +308,10 @@ enum AiProvider {
   LMSTUDIO
   /// Groq's OpenAI-compatible API.
   GROQ
+  /// NVIDIA NIM's OpenAI-compatible API.
+  NIM
+  /// Google AI Studio's Gemini OpenAI-compatible API.
+  GOOGLE_AI_STUDIO
 }
 
 enum Creativity {

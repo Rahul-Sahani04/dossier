@@ -7,6 +7,7 @@ import { LMSTUDIO_UNREACHABLE, LmStudioProvider } from "./providers/lmstudio";
 import { LocalProvider } from "./providers/local";
 import { MISTRAL_FALLBACK_MODELS, MistralProvider } from "./providers/mistral";
 import { MockProvider } from "./providers/mock";
+import { FallbackProvider } from "./providers/fallback";
 import { OllamaProvider } from "./providers/ollama";
 import { OpenAICompatibleProvider } from "./providers/openai-compatible";
 import { hang, json, refused, stubFetch } from "./test-http";
@@ -154,6 +155,23 @@ describe("OpenAICompatibleProvider", () => {
     stubFetch(() => json({ object: "list", data: [{ id: "b-model", object: "model" }, { id: "a-model", object: "model" }] }));
     const provider = new OpenAICompatibleProvider("OPENAI", "https://api.example.com/v1", "sk", null, 60_000);
     expect(await provider.listModels()).toEqual(["a-model", "b-model"]);
+  });
+});
+
+describe("FallbackProvider", () => {
+  it("moves to the next provider after a retryable provider failure", async () => {
+    const primary = new MockProvider({ reply: () => { throw AiError.of("busy"); } });
+    const fallback = new MockProvider({ reply: () => "from fallback" });
+    expect(await new FallbackProvider([primary, fallback]).complete(ask)).toBe("from fallback");
+    expect(primary.calls).toHaveLength(1);
+    expect(fallback.calls).toHaveLength(1);
+  });
+
+  it("does not hide configuration failures", async () => {
+    const primary = new MockProvider({ reply: () => { throw AiError.config("bad config"); } });
+    const fallback = new MockProvider({ reply: () => "from fallback" });
+    await expect(new FallbackProvider([primary, fallback]).complete(ask)).rejects.toMatchObject({ kind: "config" });
+    expect(fallback.calls).toHaveLength(0);
   });
 });
 

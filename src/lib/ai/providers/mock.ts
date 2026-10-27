@@ -15,7 +15,7 @@ export class MockProvider extends BaseProvider {
   constructor(
     private readonly options: { model?: string | null; models?: string[]; reply?: MockReply; timeoutMs?: number } = {},
   ) {
-    super(options.model === undefined ? "mock-model" : options.model, options.timeoutMs ?? 60_000);
+    super(options.model === undefined ? "mock-model" : options.model, options.timeoutMs ?? 60_000, 1);
   }
 
   protected async chat(call: ChatCall): Promise<ChatAnswer> {

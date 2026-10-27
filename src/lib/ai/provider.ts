@@ -32,7 +32,7 @@ export type JsonCompletionRequest<T> = CompletionRequest & {
 };
 
 export interface AIProvider {
-  readonly kind: AiProviderKind | "MOCK";
+  readonly kind: AiProviderKind | "MOCK" | "FALLBACK";
   /** The configured model, if any. */
   readonly model: string | null;
   /** The model's answer as text. */
@@ -76,12 +76,14 @@ const DEFAULT_MAX_TOKENS = 4096;
  * Implementations only send one chat call and list models.
  */
 export abstract class BaseProvider implements AIProvider {
-  abstract readonly kind: AiProviderKind | "MOCK";
+  abstract readonly kind: AiProviderKind | "MOCK" | "FALLBACK";
 
   constructor(
     readonly model: string | null,
     /** How long one call may take before it's abandoned. */
     protected readonly timeoutMs: number,
+    /** Total attempts for a provider call, including the first one. */
+    protected readonly retryCount = 2,
   ) {}
 
   /** Sends one chat call and returns the answer. */
@@ -100,17 +102,21 @@ export abstract class BaseProvider implements AIProvider {
     const model = this.requireModel();
     const schema = "schema" in request ? request.schema : undefined;
     const call = (messages: ChatMessage[]) =>
-      this.guard(model, request.signal, (signal) =>
-        this.chat({
-          model,
-          system: request.system,
-          messages,
-          temperature: request.creativity && this.acceptsTemperature() ? TEMPERATURES[request.creativity] : undefined,
-          effort: request.effort,
-          json: schema ? { schema, name: ("schemaName" in request && request.schemaName) || "result" } : undefined,
-          maxTokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
-          signal,
-        }),
+      this.retry(
+        () =>
+          this.guard(model, request.signal, (signal) =>
+            this.chat({
+              model,
+              system: request.system,
+              messages,
+              temperature: request.creativity && this.acceptsTemperature() ? TEMPERATURES[request.creativity] : undefined,
+              effort: request.effort,
+              json: schema ? { schema, name: ("schemaName" in request && request.schemaName) || "result" } : undefined,
+              maxTokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
+              signal,
+            }),
+          ),
+        request.signal,
       );
 
     const answer = await call(request.messages);
@@ -164,6 +170,27 @@ export abstract class BaseProvider implements AIProvider {
       return await call(combined);
     } catch (error) {
       throw toAiError(error, { model, cancelled: signal?.aborted, timedOut: timeout.aborted });
+    }
+  }
+
+  /** Retries transient provider failures before the configured fallback gets a chance. */
+  private async retry<R>(call: () => Promise<R>, signal?: AbortSignal): Promise<R> {
+    let attempt = 0;
+    for (;;) {
+      try {
+        return await call();
+      } catch (error) {
+        if (!(error instanceof AiError) || !error.retryable || attempt + 1 >= this.retryCount || signal?.aborted) throw error;
+        const delay = Math.min(1_000, 150 * 2 ** attempt);
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, delay);
+          signal?.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(AiError.of("cancelled"));
+          }, { once: true });
+        });
+        attempt++;
+      }
     }
   }
 }

@@ -37,19 +37,20 @@ export class OpenAICompatibleProvider extends BaseProvider {
   protected readonly client: OpenAI;
 
   constructor(
-    readonly kind: "OPENAI" | "LOCAL" | "MISTRAL" | "LMSTUDIO" | "GROQ",
+    readonly kind: "OPENAI" | "LOCAL" | "MISTRAL" | "LMSTUDIO" | "GROQ" | "NIM" | "GOOGLE_AI_STUDIO",
     private readonly baseURL: string,
     apiKey: string | null,
     model: string | null,
     timeoutMs: number,
+    retryCount = 2,
   ) {
-    super(model, timeoutMs);
+    super(model, timeoutMs, retryCount);
     // Local servers often need no key, but the SDK insists on one.
     this.client = new OpenAI({
       baseURL,
       apiKey: apiKey || "not-needed",
       timeout: timeoutMs,
-      maxRetries: 1,
+      maxRetries: 0,
       // With a key attached, no redirects to other hosts (E11-5).
       ...(apiKey ? { fetch: keyGuardedFetch() } : {}),
     });

@@ -20,8 +20,9 @@ export class OllamaProvider extends BaseProvider {
     private readonly host: string,
     model: string | null,
     timeoutMs: number,
+    retryCount = 2,
   ) {
-    super(model, timeoutMs);
+    super(model, timeoutMs, retryCount);
   }
 
   /** A client whose requests end when `signal` does. */

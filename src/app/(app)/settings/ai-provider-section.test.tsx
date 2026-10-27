@@ -35,6 +35,8 @@ describe("AiProviderSection", () => {
       "Anthropic",
       "Mistral",
       "Groq",
+      "NVIDIA NIM",
+      "Google AI Studio",
     ]);
     expect(screen.getByRole("radio", { name: "Local model" })).toBeChecked();
     expect(screen.getByLabelText("Server address")).toHaveValue("http://ollama:11434");

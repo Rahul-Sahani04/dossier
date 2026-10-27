@@ -99,6 +99,31 @@ export const PROVIDER_OPTIONS: readonly {
     defaultAgentModel: "openai/gpt-oss-20b",
     apiKey: { label: "API key" },
   },
+  {
+    value: AiProvider.NIM,
+    name: "NVIDIA NIM",
+    vendor: "NVIDIA",
+    description: "NVIDIA-hosted models through the OpenAI-compatible NIM API.",
+    tag: "Hosted · fallback-friendly",
+    local: false,
+    defaultUrl: "https://integrate.api.nvidia.com/v1",
+    urlPlaceholder: "https://integrate.api.nvidia.com/v1",
+    defaultModel: "meta/llama-3.1-8b-instruct",
+    apiKey: { label: "NVIDIA API key" },
+  },
+  {
+    value: AiProvider.GOOGLE_AI_STUDIO,
+    name: "Google AI Studio",
+    vendor: "Google",
+    description: "Gemini models through Google AI Studio's OpenAI-compatible API.",
+    tag: "Hosted · fallback-friendly",
+    local: false,
+    defaultUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    urlPlaceholder: "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: "gemini-2.5-flash",
+    defaultAgentModel: "gemini-2.5-flash-lite",
+    apiKey: { label: "Google AI API key" },
+  },
 ];
 
 export function providerOption(provider: AiProvider) {

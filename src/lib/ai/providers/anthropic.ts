@@ -31,9 +31,10 @@ export class AnthropicProvider extends BaseProvider {
     apiKey: string | null,
     model: string | null,
     timeoutMs: number,
+    retryCount = 2,
   ) {
-    super(model, timeoutMs);
-    this.client = apiKey ? new Anthropic({ apiKey, baseURL, timeout: timeoutMs, maxRetries: 1, fetch: keyGuardedFetch() }) : null;
+    super(model, timeoutMs, retryCount);
+    this.client = apiKey ? new Anthropic({ apiKey, baseURL, timeout: timeoutMs, maxRetries: 0, fetch: keyGuardedFetch() }) : null;
   }
 
   /** Current Claude models reject `temperature`; creativity is in the prompt's wording instead. */
